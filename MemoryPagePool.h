@@ -70,7 +70,7 @@ class MemoryPagePool : public details::MemoryPageSize
   virtual blocks_t default_maximum_chunk_size(blocks_t UNUSED_ARG(minimum_chunk_size)) { return 1024; }
 
  public:
-  MemoryPagePool(size_t block_size,                     // The size of a block as returned by allocate(), in bytes; must be a multiple the memory page size.
+  MemoryPagePool(size_t block_size,                     // The size of a block as returned by allocate(), in bytes; must be a multiple of the memory page size.
                  blocks_t minimum_chunk_size = 0,       // A value of 0 will use the value returned by default_minimum_chunk_size().
                  blocks_t maximum_chunk_size = 0);      // A value of 0 will use the value returned by default_maximum_chunk_size(minimum_chunk_size).
   virtual ~MemoryPagePool()
