@@ -127,16 +127,17 @@ class SimpleSegregatedStorageBase
   void deallocate(void* ptr)
   {
     FreeNode* const new_front_node = static_cast<FreeNode*>(ptr);
-    PtrTag const new_head_tag(new_front_node, 0);
     PtrTag head_tag(m_head_tag.load(std::memory_order_relaxed));
-    do
+    for (;;)
     {
+      PtrTag const new_head_tag(new_front_node, head_tag.tag());
       new_front_node->m_next = head_tag.ptr();
-    }
-    while (!CAS_head_tag(head_tag, new_head_tag, std::memory_order_release));
       // The std::memory_order_release is used in the case of success and causes the above
       // store to `new_front_node->m_next` to be visible after a load-acquire of m_head_tag
       // in allocate that reads the value of this `new_head_tag`.
+      if (AI_LIKELY(CAS_head_tag(head_tag, new_head_tag, std::memory_order_release)))
+        return;
+    }
   }
 };
 
@@ -148,11 +149,13 @@ struct PtrTag
   static constexpr std::uintptr_t ptr_mask = ~tag_mask;
   static constexpr std::uintptr_t end_of_list = tag_mask;
 
-  FreeNode* ptr() const { return reinterpret_cast<FreeNode*>(encoded_ & ptr_mask); }
   static constexpr std::uintptr_t encode(void* ptr, uint32_t tag)
   {
     return reinterpret_cast<std::uintptr_t>(ptr) | (tag & tag_mask);
   }
+
+  FreeNode* ptr() const { return reinterpret_cast<FreeNode*>(encoded_ & ptr_mask); }
+  std::uintptr_t tag() const { return encoded_ & tag_mask; }
 
   PtrTag(std::uintptr_t encoded) : encoded_(encoded) { }
   PtrTag(FreeNode* node, std::uintptr_t tag) : encoded_(node ? PtrTag::encode(node, tag) : end_of_list) { }
@@ -161,7 +164,7 @@ struct PtrTag
   {
     FreeNode* front_node = ptr();
     FreeNode* second_node = front_node->m_next;
-    return {second_node, 0};
+    return {second_node, tag() + 1};
   }
 
   bool operator!=(std::uintptr_t encoded) const { return encoded_ != encoded; }

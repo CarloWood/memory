@@ -31,6 +31,7 @@ void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t p
 
   FreeNode* const first_node = reinterpret_cast<FreeNode*>(first_ptr);
   FreeNode* const last_node = reinterpret_cast<FreeNode*>(last_ptr);
+  // Use a tag of zero because this is a completely new block anyway.
   PtrTag const new_head_tag(first_node, 0);
   PtrTag head_tag(m_head_tag.load(std::memory_order_relaxed));
   do
