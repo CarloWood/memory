@@ -33,12 +33,10 @@
 namespace memory {
 
 MemoryPagePool::MemoryPagePool(size_t block_size, blocks_t minimum_chunk_size, blocks_t maximum_chunk_size) :
-  m_block_size(block_size), m_pool_blocks(0),
+  MemoryPagePoolBase(block_size),
   m_minimum_chunk_size(minimum_chunk_size ? minimum_chunk_size : default_minimum_chunk_size()),
   m_maximum_chunk_size(maximum_chunk_size ? maximum_chunk_size : default_maximum_chunk_size(m_minimum_chunk_size))
 {
-  // block_size must be a multiple of memory_page_size (and larger than 0).
-  ASSERT(block_size % memory_page_size() == 0);
   // minimum_chunk_size must be larger or equal than 1.
   ASSERT(m_minimum_chunk_size >= 1);
   // maximum_chunk_size must be larger or equal than minimum_chunk_size.
