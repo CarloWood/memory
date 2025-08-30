@@ -7,7 +7,7 @@ namespace memory {
 bool SimpleSegregatedStorage::try_allocate_more(std::function<bool()> const& add_new_block)
 {
   std::scoped_lock<std::mutex> lk(m_add_block_mutex);
-  return m_head.load(std::memory_order_relaxed) != nullptr || add_new_block();
+  return m_head_tag.load(std::memory_order_relaxed) != PtrTag::end_of_list || add_new_block();
 }
 
 // Only call this from the lambda add_new_block that was passed to allocate.
@@ -28,11 +28,16 @@ void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t p
     reinterpret_cast<FreeNode*>(node)->m_next = reinterpret_cast<FreeNode*>(next_node);
   }
   while (node != first_ptr);
-  FreeNode* first_node = reinterpret_cast<FreeNode*>(first_ptr);
-  FreeNode* last_node = reinterpret_cast<FreeNode*>(last_ptr);
-  last_node->m_next = m_head.load(std::memory_order_relaxed);
-  while (!m_head.compare_exchange_weak(last_node->m_next, first_node, std::memory_order_release))
-    ;
+
+  FreeNode* const first_node = reinterpret_cast<FreeNode*>(first_ptr);
+  FreeNode* const last_node = reinterpret_cast<FreeNode*>(last_ptr);
+  PtrTag const new_head_tag(first_node, 0);
+  PtrTag head_tag(m_head_tag.load(std::memory_order_relaxed));
+  do
+  {
+    last_node->m_next = head_tag.ptr();
+  }
+  while (!CAS_head_tag(head_tag, new_head_tag, std::memory_order_release));
 }
 
 } // namespace memory

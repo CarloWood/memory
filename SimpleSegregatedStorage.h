@@ -31,6 +31,7 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include <cstdint>
 
 namespace memory {
 
@@ -65,45 +66,56 @@ namespace memory {
 // node->m_next = m_head;
 // m_head = node;
 
+// A deallocated (free) node.
+struct FreeNode
+{
+  FreeNode* m_next;     // Points to the next free node, nullptr (the meaning of which depends on PtrTag).
+};
+
 // SimpleSegregatedStorageBase
 //
 // Maintains an unordered free list of blocks.
 //
+template<typename PtrTag>
 class SimpleSegregatedStorageBase
 {
  protected:
-  struct FreeNode { FreeNode* m_next; };
-
-  std::atomic<FreeNode*> m_head;        // Points to the first free memory block in the free-list, or nullptr if the free-list is empty.
+  std::atomic<std::uintptr_t> m_head_tag;       // Encodes a pointer that points to the first free memory block in the free-list,
+                                                // or end_of_list if the free-list is empty. Also encodes a "tag" of a few bits.
 
   // Construct an empty free list.
-  SimpleSegregatedStorageBase() : m_head(nullptr) { }
+  SimpleSegregatedStorageBase() : m_head_tag(PtrTag::end_of_list) { }
   // Allow pointers to SimpleSegregatedStorageBase that are allocated on the heap I guess...
   virtual ~SimpleSegregatedStorageBase() = default;
 
-  // Called if `allocate()` runs into the end of the list (m_head becomes null).
+  // Called if `allocate()` runs into the end of the list.
   // Returning false means that this storage is simply out of memory.
   virtual bool try_allocate_more(std::function<bool()> const& add_new_block) { return false; }
+
+  [[gnu::always_inline]] bool CAS_head_tag(PtrTag& head_tag, PtrTag new_head_tag, std::memory_order order)
+  {
+    return m_head_tag.compare_exchange_weak(head_tag.encoded_, new_head_tag.encoded_, order);
+  }
 
  public:
   void* allocate(std::function<bool()> const& add_new_block)
   {
-    // Load the current value of m_head into `head`.
-    // Use std::memory_order_acquire to synchronize with the std::memory_order_release in deallocate,
-    // so that value of `next` read below will be the value written in deallocate corresponding to
-    // this head value.
     for (;;)
     {
-      FreeNode* head = m_head.load(std::memory_order_acquire);
-      while (head)
+      // Load the current value of m_head_tag into `head_tag`.
+      // Use std::memory_order_acquire to synchronize with the std::memory_order_release in deallocate,
+      // so that value of `next` read below will be the value written in deallocate corresponding to
+      // this head value.
+      PtrTag head_tag(m_head_tag.load(std::memory_order_acquire));
+      while (head_tag != PtrTag::end_of_list)
       {
-        FreeNode* next = head->m_next;
+        PtrTag new_head_tag = head_tag.next();
         // The std::memory_order_acquire is used in case of failure and required for the next
         // read of m_next at the top of the current loop (the previous line).
-        if (AI_LIKELY(m_head.compare_exchange_weak(head, next, std::memory_order_acquire)))
-          // Return the previous value of m_head (that we just replaced with `next`).
-          return head;
-        // m_head was changed (this value is now in `head`). Try again with the new value.
+        if (AI_LIKELY(CAS_head_tag(head_tag, new_head_tag, std::memory_order_acquire)))
+          // Return the old head.
+          return head_tag.ptr();
+        // m_head_tag was changed (the new value is now in `head_tag`). Try again with the new value.
       }
       // Reached the end of the list, try to allocate more memory.
       if (!try_allocate_more(add_new_block))
@@ -114,17 +126,48 @@ class SimpleSegregatedStorageBase
   // ptr must be a value previously returned by allocate().
   void deallocate(void* ptr)
   {
-    FreeNode* node = static_cast<FreeNode*>(ptr);
-    node->m_next = m_head.load(std::memory_order_relaxed);
-    // The std::memory_order_release is used in the case of success and causes the
-    // above store to `node->m_next` to be visible after a load-acquire of m_head
-    // in allocate that reads the value of this `node`.
-    while (!m_head.compare_exchange_weak(node->m_next, node, std::memory_order_release))
-      ;
+    FreeNode* const new_front_node = static_cast<FreeNode*>(ptr);
+    PtrTag const new_head_tag(new_front_node, 0);
+    PtrTag head_tag(m_head_tag.load(std::memory_order_relaxed));
+    do
+    {
+      new_front_node->m_next = head_tag.ptr();
+    }
+    while (!CAS_head_tag(head_tag, new_head_tag, std::memory_order_release));
+      // The std::memory_order_release is used in the case of success and causes the above
+      // store to `new_front_node->m_next` to be visible after a load-acquire of m_head_tag
+      // in allocate that reads the value of this `new_head_tag`.
   }
 };
 
-class SimpleSegregatedStorage : public SimpleSegregatedStorageBase
+struct PtrTag
+{
+  std::uintptr_t encoded_;
+
+  static constexpr std::uintptr_t tag_mask = 0x3;
+  static constexpr std::uintptr_t ptr_mask = ~tag_mask;
+  static constexpr std::uintptr_t end_of_list = tag_mask;
+
+  FreeNode* ptr() const { return reinterpret_cast<FreeNode*>(encoded_ & ptr_mask); }
+  static constexpr std::uintptr_t encode(void* ptr, uint32_t tag)
+  {
+    return reinterpret_cast<std::uintptr_t>(ptr) | (tag & tag_mask);
+  }
+
+  PtrTag(std::uintptr_t encoded) : encoded_(encoded) { }
+  PtrTag(FreeNode* node, std::uintptr_t tag) : encoded_(node ? PtrTag::encode(node, tag) : end_of_list) { }
+
+  PtrTag next() const
+  {
+    FreeNode* front_node = ptr();
+    FreeNode* second_node = front_node->m_next;
+    return {second_node, 0};
+  }
+
+  bool operator!=(std::uintptr_t encoded) const { return encoded_ != encoded; }
+};
+
+class SimpleSegregatedStorage : public SimpleSegregatedStorageBase<PtrTag>
 {
  public:                                // To be used with std::scoped_lock<std::mutex> from calling classes.
   std::mutex m_add_block_mutex;         // Protect against calling add_block concurrently.
