@@ -92,9 +92,9 @@ class SimpleSegregatedStorageBase
     // Use std::memory_order_acquire to synchronize with the std::memory_order_release in deallocate,
     // so that value of `next` read below will be the value written in deallocate corresponding to
     // this head value.
-    FreeNode* head = m_head.load(std::memory_order_acquire);
     for (;;)
     {
+      FreeNode* head = m_head.load(std::memory_order_acquire);
       while (head)
       {
         FreeNode* next = head->m_next;
