@@ -39,12 +39,14 @@ target_sources(memory_ObjLib
   PRIVATE
     "DequeMemoryResource.cxx"
     "MemoryPagePool.cxx"
+    "MemoryMappedPool.cxx"
     "NodeMemoryPool.cxx"
     "SimpleSegregatedStorage.cxx"
 
     "DequeAllocator.h"
     "DequeMemoryResource.h"
     "MemoryPagePool.h"
+    "MemoryMappedPool.h"
     "NodeMemoryPool.h"
     "NodeMemoryResource.h"
     "SimpleSegregatedStorage.h"

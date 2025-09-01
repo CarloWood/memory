@@ -2,7 +2,7 @@
  * memory -- C++ Memory utilities
  *
  * @file
- * @brief Definition of class MemoryPagePool.
+ * @brief Declaration of class MemoryPagePool.
  *
  * @Copyright (C) 2019 - 2025  Carlo Wood.
  *
@@ -27,7 +27,9 @@
 
 #pragma once
 
-#include "utils/macros.h"               // AI_UNLIKELY
+#include "utils/macros.h"                       // AI_UNLIKELY
+#include "utils/log2.h"                         // utils::log2
+#include "utils/nearest_power_of_two.h"         // utils::nearest_power_of_two
 #include "SimpleSegregatedStorage.h"
 #include <algorithm>
 #include <mutex>
@@ -60,11 +62,7 @@ class MemoryPagePoolBase : public details::MemoryPageSize
   blocks_t m_pool_blocks;               // The total amount of available memory, in blocks.
 
  protected:
-  MemoryPagePoolBase(size_t block_size) : m_block_size(block_size), m_pool_blocks(0)
-  {
-    // block_size must be a multiple of memory_page_size (and larger than 0).
-    ASSERT(block_size % memory_page_size() == 0);
-  }
+  MemoryPagePoolBase(size_t block_size) : m_block_size(block_size), m_pool_blocks(0) { }
 
   virtual ~MemoryPagePoolBase() = default;
 
@@ -80,7 +78,7 @@ class MemoryPagePoolBase : public details::MemoryPageSize
 //
 class MemoryPagePool : public MemoryPagePoolBase
 {
- private:
+ protected:
   SimpleSegregatedStorage m_sss;
   blocks_t const m_minimum_chunk_size;  // The minimum size of internally allocated contiguous memory blocks, in blocks.
   blocks_t const m_maximum_chunk_size;  // The maximum size of internally allocated contiguous memory blocks, in blocks.
@@ -91,9 +89,12 @@ class MemoryPagePool : public MemoryPagePoolBase
   virtual blocks_t default_maximum_chunk_size(blocks_t UNUSED_ARG(minimum_chunk_size)) { return 1024; }
 
  public:
-  MemoryPagePool(size_t block_size,                     // The size of a block as returned by allocate(), in bytes; must be a multiple of the memory page size.
+  MemoryPagePool(size_t block_size,                     // The size of a block as returned by allocate(), in bytes;
+                                                        // must be a multiple of the memory page size.
                  blocks_t minimum_chunk_size = 0,       // A value of 0 will use the value returned by default_minimum_chunk_size().
-                 blocks_t maximum_chunk_size = 0);      // A value of 0 will use the value returned by default_maximum_chunk_size(minimum_chunk_size).
+                 blocks_t maximum_chunk_size = 0);      // A value of 0 will use the value returned by
+                                                        // default_maximum_chunk_size(minimum_chunk_size).
+
   ~MemoryPagePool() override
   {
     DoutEntering(dc::notice, "MemoryPagePool::~MemoryPagePool() [" << this << "]");

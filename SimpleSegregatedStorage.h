@@ -2,7 +2,7 @@
  * memory -- C++ Memory utilities
  *
  * @file
- * @brief Definition of class SimpleSegregatedStorage.
+ * @brief Declaration of class SimpleSegregatedStorage.
  *
  * @Copyright (C) 2019 - 2025  Carlo Wood.
  *
@@ -27,11 +27,11 @@
 
 #pragma once
 
+#include "PtrTag.h"
 #include "utils/macros.h"
 #include <atomic>
 #include <functional>
 #include <mutex>
-#include <cstdint>
 
 namespace memory {
 
@@ -54,29 +54,22 @@ namespace memory {
 //
 // Or in code:
 //
-// node = m_head
-// m_head = node->m_next;
-// return node;
+//   node = m_head
+//   m_head = node->m_next;
+//   return node;
 //
 // When multiple threads can call allocate() concurrently, this can only be implemented
 // in a lock-free way by using an atomic compare and exchange operation.
 //
 // Deallocating a node is the other way around:
 //
-// node->m_next = m_head;
-// m_head = node;
-
-// A deallocated (free) node.
-struct FreeNode
-{
-  FreeNode* m_next;     // Points to the next free node, nullptr (the meaning of which depends on PtrTag).
-};
+//   node->m_next = m_head;
+//   m_head = node;
 
 // SimpleSegregatedStorageBase
 //
 // Maintains an unordered free list of blocks.
 //
-template<typename PtrTag>
 class SimpleSegregatedStorageBase
 {
  protected:
@@ -85,6 +78,7 @@ class SimpleSegregatedStorageBase
 
   // Construct an empty free list.
   SimpleSegregatedStorageBase() : m_head_tag(PtrTag::end_of_list) { }
+
   // Allow pointers to SimpleSegregatedStorageBase that are allocated on the heap I guess...
   virtual ~SimpleSegregatedStorageBase() = default;
 
@@ -98,6 +92,14 @@ class SimpleSegregatedStorageBase
   }
 
  public:
+  // Initialize this SimpleSegregatedStorage with an existing free-list.
+  void initialize(void* head)
+  {
+    // Call this after default construction, before using the segregated storage.
+    ASSERT(m_head_tag == PtrTag::end_of_list);
+    m_head_tag = PtrTag::encode(head, 0);
+  }
+
   void* allocate(std::function<bool()> const& add_new_block)
   {
     for (;;)
@@ -126,7 +128,7 @@ class SimpleSegregatedStorageBase
   // ptr must be a value previously returned by allocate().
   void deallocate(void* ptr)
   {
-    FreeNode* const new_front_node = static_cast<FreeNode*>(ptr);
+    typename PtrTag::FreeNode* const new_front_node = static_cast<typename PtrTag::FreeNode*>(ptr);
     PtrTag head_tag(m_head_tag.load(std::memory_order_relaxed));
     for (;;)
     {
@@ -141,36 +143,7 @@ class SimpleSegregatedStorageBase
   }
 };
 
-struct PtrTag
-{
-  std::uintptr_t encoded_;
-
-  static constexpr std::uintptr_t tag_mask = 0x3;
-  static constexpr std::uintptr_t ptr_mask = ~tag_mask;
-  static constexpr std::uintptr_t end_of_list = tag_mask;
-
-  static constexpr std::uintptr_t encode(void* ptr, uint32_t tag)
-  {
-    return reinterpret_cast<std::uintptr_t>(ptr) | (tag & tag_mask);
-  }
-
-  FreeNode* ptr() const { return reinterpret_cast<FreeNode*>(encoded_ & ptr_mask); }
-  std::uintptr_t tag() const { return encoded_ & tag_mask; }
-
-  PtrTag(std::uintptr_t encoded) : encoded_(encoded) { }
-  PtrTag(FreeNode* node, std::uintptr_t tag) : encoded_(node ? PtrTag::encode(node, tag) : end_of_list) { }
-
-  PtrTag next() const
-  {
-    FreeNode* front_node = ptr();
-    FreeNode* second_node = front_node->m_next;
-    return {second_node, tag() + 1};
-  }
-
-  bool operator!=(std::uintptr_t encoded) const { return encoded_ != encoded; }
-};
-
-class SimpleSegregatedStorage : public SimpleSegregatedStorageBase<PtrTag>
+class SimpleSegregatedStorage : public SimpleSegregatedStorageBase
 {
  public:                                // To be used with std::scoped_lock<std::mutex> from calling classes.
   std::mutex m_add_block_mutex;         // Protect against calling add_block concurrently.

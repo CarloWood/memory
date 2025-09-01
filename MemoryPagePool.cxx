@@ -27,8 +27,6 @@
 
 #include "sys.h"
 #include "MemoryPagePool.h"
-#include "utils/log2.h"                         // utils::log2
-#include "utils/nearest_power_of_two.h"         // utils::nearest_power_of_two
 
 namespace memory {
 
@@ -42,7 +40,8 @@ MemoryPagePool::MemoryPagePool(size_t block_size, blocks_t minimum_chunk_size, b
   // maximum_chunk_size must be larger or equal than minimum_chunk_size.
   ASSERT(m_maximum_chunk_size >= m_minimum_chunk_size);
 
-  DoutEntering(dc::notice, "MemoryPagePool::MemoryPagePool(" << block_size << ", " << minimum_chunk_size << ", " << maximum_chunk_size << ") [" << this << "]");
+  DoutEntering(dc::notice, "MemoryPagePool::MemoryPagePool(" <<
+      block_size << ", " << minimum_chunk_size << ", " << maximum_chunk_size << ") [" << this << "]");
 
   // This capacity is enough for allocating twice the maximum_chunk_size of memory (and then rounded up to the nearest power of two).
   m_chunks.reserve(utils::nearest_power_of_two(1 + utils::log2(m_maximum_chunk_size)));
