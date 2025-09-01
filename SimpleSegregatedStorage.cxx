@@ -33,8 +33,8 @@ namespace memory {
 
 bool SimpleSegregatedStorage::try_allocate_more(std::function<bool()> const& add_new_block)
 {
-  std::scoped_lock<std::mutex> lk(m_add_block_mutex);
-  return this->m_head_tag.load(std::memory_order_relaxed) != PtrTag::end_of_list || add_new_block();
+  std::scoped_lock<std::mutex> lk(add_block_mutex_);
+  return this->head_tag_.load(std::memory_order_relaxed) != PtrTag::end_of_list || add_new_block();
 }
 
 // Only call this from the lambda add_new_block that was passed to allocate.
@@ -52,7 +52,7 @@ void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t p
   {
     char* next_node = node;
     node = next_node - partition_size;
-    reinterpret_cast<typename PtrTag::FreeNode*>(node)->m_next = reinterpret_cast<typename PtrTag::FreeNode*>(next_node);
+    reinterpret_cast<typename PtrTag::FreeNode*>(node)->next_ = reinterpret_cast<typename PtrTag::FreeNode*>(next_node);
   }
   while (node != first_ptr);
 
@@ -60,10 +60,10 @@ void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t p
   typename PtrTag::FreeNode* const last_node = reinterpret_cast<typename PtrTag::FreeNode*>(last_ptr);
   // Use a tag of zero because this is a completely new block anyway.
   PtrTag const new_head_tag{first_node, std::uintptr_t{0}};
-  PtrTag head_tag(this->m_head_tag.load(std::memory_order_relaxed));
+  PtrTag head_tag(this->head_tag_.load(std::memory_order_relaxed));
   do
   {
-    last_node->m_next = head_tag.ptr();
+    last_node->next_ = head_tag.ptr();
   }
   while (!this->CAS_head_tag(head_tag, new_head_tag, std::memory_order_release));
 }

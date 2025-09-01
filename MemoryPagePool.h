@@ -58,17 +58,17 @@ class MemoryPagePoolBase : public details::MemoryPageSize
   using blocks_t = unsigned int;
 
  protected:
-  size_t const m_block_size;            // The size of a block as returned by allocate(), in bytes.
-  blocks_t m_pool_blocks;               // The total amount of available memory, in blocks.
+  size_t const block_size_;             // The size of a block as returned by allocate(), in bytes.
+  blocks_t pool_blocks_;                // The total amount of available memory, in blocks.
 
  protected:
-  MemoryPagePoolBase(size_t block_size) : m_block_size(block_size), m_pool_blocks(0) { }
+  MemoryPagePoolBase(size_t block_size) : block_size_(block_size), pool_blocks_(0) { }
 
   virtual ~MemoryPagePoolBase() = default;
 
  public:
   // Accessor.
-  size_t block_size() const { return m_block_size; }
+  size_t block_size() const { return block_size_; }
 
   virtual void* allocate() = 0;
   virtual void deallocate(void* ptr) = 0;
@@ -79,10 +79,10 @@ class MemoryPagePoolBase : public details::MemoryPageSize
 class MemoryPagePool : public MemoryPagePoolBase
 {
  protected:
-  SimpleSegregatedStorage m_sss;
-  blocks_t const m_minimum_chunk_size;  // The minimum size of internally allocated contiguous memory blocks, in blocks.
-  blocks_t const m_maximum_chunk_size;  // The maximum size of internally allocated contiguous memory blocks, in blocks.
-  std::vector<void*> m_chunks;          // All allocated chunks that were allocated with std::aligned_alloc.
+  SimpleSegregatedStorage sss_;
+  blocks_t const minimum_chunk_size_;  // The minimum size of internally allocated contiguous memory blocks, in blocks.
+  blocks_t const maximum_chunk_size_;  // The maximum size of internally allocated contiguous memory blocks, in blocks.
+  std::vector<void*> chunks_;          // All allocated chunks that were allocated with std::aligned_alloc.
 
  protected:
   virtual blocks_t default_minimum_chunk_size() { return 2; }
@@ -103,28 +103,28 @@ class MemoryPagePool : public MemoryPagePoolBase
 
   void* allocate() override
   {
-    return m_sss.allocate([this](){
-        // This runs in the critical area of SimpleSegregatedStorage::m_add_block_mutex.
-        blocks_t extra_blocks = std::clamp(m_pool_blocks, m_minimum_chunk_size, m_maximum_chunk_size);
-        size_t extra_size = extra_blocks * m_block_size;
+    return sss_.allocate([this](){
+        // This runs in the critical area of SimpleSegregatedStorage::add_block_mutex_.
+        blocks_t extra_blocks = std::clamp(pool_blocks_, minimum_chunk_size_, maximum_chunk_size_);
+        size_t extra_size = extra_blocks * block_size_;
         void* chunk = std::aligned_alloc(memory_page_size(), extra_size);
         if (AI_UNLIKELY(chunk == nullptr))
           return false;
-        m_sss.add_block(chunk, extra_size, m_block_size);
-        m_pool_blocks += extra_blocks;
-        m_chunks.push_back(chunk);
+        sss_.add_block(chunk, extra_size, block_size_);
+        pool_blocks_ += extra_blocks;
+        chunks_.push_back(chunk);
         return true;
     });
   }
 
   void deallocate(void* ptr) override
   {
-    m_sss.deallocate(ptr);
+    sss_.deallocate(ptr);
   }
 
   void release();
 
-  blocks_t pool_blocks() { std::scoped_lock<std::mutex> lock(m_sss.m_add_block_mutex); return m_pool_blocks; }
+  blocks_t pool_blocks() { std::scoped_lock<std::mutex> lock(sss_.add_block_mutex_); return pool_blocks_; }
 };
 
 } // namespace memory

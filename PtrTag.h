@@ -38,7 +38,7 @@ struct PtrTag
   // A deallocated (free) node.
   struct FreeNode
   {
-    FreeNode* m_next;   // Points to the next free node, nullptr (the meaning of which depends on PtrTag).
+    FreeNode* next_;    // Points to the next free node, nullptr (the meaning of which depends on PtrTag).
   };
 
   std::uintptr_t encoded_;
@@ -61,7 +61,7 @@ struct PtrTag
   PtrTag next() const
   {
     FreeNode* front_node = ptr();
-    FreeNode* second_node = front_node->m_next;
+    FreeNode* second_node = front_node->next_;
     return {second_node, tag() + 1};
   }
 

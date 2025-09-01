@@ -52,10 +52,10 @@ class MemoryMappedPool : public MemoryPagePoolBase
       size_t file_size = 0, Mode mode = Mode::persistent, bool zero_init = false);
   ~MemoryMappedPool() override;
 
-  void* allocate() override { return mss_.allocate(mapped_base_, mapped_size_, m_block_size); }
+  void* allocate() override { return mss_.allocate(mapped_base_, mapped_size_, block_size_); }
   void deallocate(void* ptr) override { mss_.deallocate(ptr); }
 
-  blocks_t pool_blocks() { return m_pool_blocks; }
+  blocks_t pool_blocks() { return pool_blocks_; }
 };
 
 } // namespace memory

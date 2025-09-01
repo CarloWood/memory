@@ -324,7 +324,7 @@ MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t
     THROW_LALERTE("Failed to map file [FILEPATH] of size [SIZE]",
         AIArgs("[FILEPATH]", absolute_file_path)("[SIZE]", mapped_size_));
 
-  // Set m_head to point to the start of mapped memory.
+  // Set head_tag_ to point to the start of mapped memory.
   mss_.initialize(mapped_base_);
 }
 

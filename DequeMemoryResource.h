@@ -142,10 +142,10 @@ class DequeMemoryResource
     return utils::ceil_log2(t * t) - 8;         // 0 <= result <= 11.
   }
 
-  // Used by the constructor of m_node_memory_resources.
+  // Used by the constructor of node_memory_resources_.
   DequeMemoryResource() = default;
 
-  // The actual initialization of m_node_memory_resources must be done after reaching main()
+  // The actual initialization of node_memory_resources_ must be done after reaching main()
   // (after initialization of a MemoryPagePool).
   void init(MemoryPagePool* mpp_ptr);
 
@@ -176,7 +176,7 @@ class DequeMemoryResource
   // The default memory pool allocates 32 kB blocks, so that means the largest value (451 * sizeof(void*) = 3608 bytes) needs a new call to malloc
   // every 9 allocations of 3608 bytes. Larger values (the next being 5104) are allocated directly with malloc.
   using node_memory_resources_container_t = std::array<NodeMemoryResource, nmra_size>;  // Note that the size of NodeMemoryResource is 64 bytes.
-  node_memory_resources_container_t m_node_memory_resources = {};
+  node_memory_resources_container_t node_memory_resources_ = {};
 };
 
 } // namespace memory

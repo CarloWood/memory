@@ -32,31 +32,31 @@ namespace memory {
 
 MemoryPagePool::MemoryPagePool(size_t block_size, blocks_t minimum_chunk_size, blocks_t maximum_chunk_size) :
   MemoryPagePoolBase(block_size),
-  m_minimum_chunk_size(minimum_chunk_size ? minimum_chunk_size : default_minimum_chunk_size()),
-  m_maximum_chunk_size(maximum_chunk_size ? maximum_chunk_size : default_maximum_chunk_size(m_minimum_chunk_size))
+  minimum_chunk_size_(minimum_chunk_size ? minimum_chunk_size : default_minimum_chunk_size()),
+  maximum_chunk_size_(maximum_chunk_size ? maximum_chunk_size : default_maximum_chunk_size(minimum_chunk_size_))
 {
   // minimum_chunk_size must be larger or equal than 1.
-  ASSERT(m_minimum_chunk_size >= 1);
+  ASSERT(minimum_chunk_size_ >= 1);
   // maximum_chunk_size must be larger or equal than minimum_chunk_size.
-  ASSERT(m_maximum_chunk_size >= m_minimum_chunk_size);
+  ASSERT(maximum_chunk_size_ >= minimum_chunk_size_);
 
   DoutEntering(dc::notice, "MemoryPagePool::MemoryPagePool(" <<
       block_size << ", " << minimum_chunk_size << ", " << maximum_chunk_size << ") [" << this << "]");
 
   // This capacity is enough for allocating twice the maximum_chunk_size of memory (and then rounded up to the nearest power of two).
-  m_chunks.reserve(utils::nearest_power_of_two(1 + utils::log2(m_maximum_chunk_size)));
+  chunks_.reserve(utils::nearest_power_of_two(1 + utils::log2(maximum_chunk_size_)));
   Dout(dc::notice, "The block size (" << block_size << " bytes) is " << (block_size / memory_page_size()) << " times the memory page size on this machine.");
-  Dout(dc::notice, "The capacity of m_chunks is " << m_chunks.capacity() << '.');
+  Dout(dc::notice, "The capacity of chunks_ is " << chunks_.capacity() << '.');
 }
 
 void MemoryPagePool::release()
 {
   DoutEntering(dc::notice, "MemoryPagePool::release()");
-  std::scoped_lock<std::mutex> lock(m_sss.m_add_block_mutex);
+  std::scoped_lock<std::mutex> lock(sss_.add_block_mutex_);
   // Wink out any remaining allocations.
-  for (auto ptr : m_chunks)
+  for (auto ptr : chunks_)
     std::free(ptr);
-  Dout(dc::notice, "current size is " << (m_pool_blocks * m_block_size) << " bytes.");
+  Dout(dc::notice, "current size is " << (pool_blocks_ * block_size_) << " bytes.");
 }
 
 } // namespace memory
