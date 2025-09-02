@@ -29,7 +29,9 @@
 #include "MemoryMappedPool.h"
 #include "utils/AIAlert.h"
 #include "utils/at_scope_end.h"
+#ifdef USE_ENCHANTUM
 #include "utils/to_string.h"
+#endif
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -109,8 +111,13 @@ std::string print_flags(int flags)
 MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t block_size, size_t file_size,
     Mode mode, bool zero_init) : MemoryPagePoolBase(block_size), mapped_base_(MAP_FAILED)
 {
-  DoutEntering(dc::notice, "MemoryMappedPool::MemoryMappedPool(" << filename << ", " << block_size << ", " << file_size <<
-      ", " << utils::to_string(mode) << std::boolalpha << zero_init << ") [" << this << "]");
+  DoutEntering(dc::notice, "MemoryMappedPool::MemoryMappedPool(" << filename << ", " << block_size << ", " << file_size << ", " <<
+#ifdef USE_ENCHANTUM
+      utils::to_string(mode) <<
+#else
+      static_cast<int>(mode) <<
+#endif
+      ", " << std::boolalpha << zero_init << ") [" << this << "]");
 
   // block_size must be capable of containing a FreeNode.
   ASSERT(block_size >= sizeof(typename PtrTag::FreeNode));

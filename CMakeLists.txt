@@ -65,11 +65,19 @@ target_compile_features(memory_ObjLib
 )
 
 # Set link dependencies.
+# If the target enchantum::enchantum is not found, then please
+# install enchantum by following the instructions here:...
 target_link_libraries(memory_ObjLib
-  PUBLIC
+  PRIVATE
     AICxx::utils
-    enchantum::enchantum
 )
+
+if (OptionUseEnchantum)
+  target_link_libraries(memory_ObjLib
+    PRIVATE
+      enchantum::enchantum
+  )
+endif ()
 
 # Create an ALIAS target.
 add_library(AICxx::memory ALIAS memory_ObjLib)

@@ -49,7 +49,7 @@ struct PtrTag
 
   static constexpr std::uintptr_t encode(void* ptr, uint32_t tag)
   {
-    return reinterpret_cast<std::uintptr_t>(ptr) | (tag & tag_mask);
+    return std::bit_cast<std::uintptr_t>(ptr) | (tag & tag_mask);
   }
 
   FreeNode* ptr() const { return reinterpret_cast<FreeNode*>(encoded_ & ptr_mask); }
