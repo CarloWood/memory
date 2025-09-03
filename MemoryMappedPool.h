@@ -55,7 +55,8 @@ class MemoryMappedPool : public MemoryPagePoolBase
   void* allocate() override { return mss_.allocate(mapped_base_, mapped_size_, block_size_); }
   void deallocate(void* ptr) override { mss_.deallocate(ptr); }
 
-  blocks_t pool_blocks() { return pool_blocks_; }
+  blocks_t pool_blocks() const { return pool_blocks_; }
+  void* mapped_base() const { return mapped_base_; }
 };
 
 } // namespace memory
