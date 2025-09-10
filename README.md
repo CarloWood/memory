@@ -12,7 +12,7 @@ providing C++ memory related utilities for larger projects, including:
 ## Prerequisites
 
 The root project should be using
-[cmake](https://cmake.org/overview/)
+[cmake](https://cmake.org/overview/),
 [cwm4](https://github.com/CarloWood/cwm4),
 [cwds](https://github.com/CarloWood/cwds) and
 [utils](https://github.com/CarloWood/ai-utils).
