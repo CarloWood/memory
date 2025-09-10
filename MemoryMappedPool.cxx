@@ -180,13 +180,15 @@ MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t
 
   // Get information about the possibly already existing file.
   fs::file_status file_status = fs::status(absolute_file_path);
-
-  bool const file_exists = file_status.type() != fs::file_type::not_found;
-  bool const file_is_regular_file = file_status.type() == fs::file_type::regular;
+  struct stat sb;
+  bool const file_exists = stat(absolute_file_path.c_str(), &sb) == 0;
+  bool const file_is_regular_file = file_exists && (sb.st_mode & S_IFMT) == S_IFREG;
+  bool const is_owner = file_is_regular_file && sb.st_uid == geteuid();
+  bool const is_group = file_is_regular_file && sb.st_gid == getegid();
   bool const is_readable = file_is_regular_file &&
-    (file_status.permissions() & (fs::perms::owner_read|fs::perms::group_read|fs::perms::others_read)) != fs::perms::none;
+    ((is_owner && (sb.st_mode & S_IRUSR) != 0) || (is_group && (sb.st_mode & S_IRGRP) != 0) || (sb.st_mode & S_IROTH) != 0);
   bool const is_writable = file_is_regular_file &&
-    (file_status.permissions() & (fs::perms::owner_write|fs::perms::group_write|fs::perms::others_write)) != fs::perms::none;
+    ((is_owner && (sb.st_mode & S_IWUSR) != 0) || (is_group && (sb.st_mode & S_IWGRP) != 0) || (sb.st_mode & S_IWOTH) != 0);
 
   std::string error;
   if (file_exists && (!file_is_regular_file || !is_readable))
@@ -272,6 +274,9 @@ MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t
       m = 0444;
     }
     fd = ::open(absolute_file_path.c_str(), flags, m);
+    if (fd == -1)
+      THROW_LALERTE("open([FILEPATH], [FLAGS], [MODE])",
+          AIArgs("[FILEPATH]", absolute_file_path)("[FLAGS]", flags)("[MODE]", m));
 
     // Set the correct mapped_size_.
     struct stat s_stat;
