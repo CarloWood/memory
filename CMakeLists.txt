@@ -72,13 +72,6 @@ target_link_libraries(memory_ObjLib
     AICxx::utils
 )
 
-if (OptionUseEnchantum)
-  target_link_libraries(memory_ObjLib
-    PRIVATE
-      enchantum::enchantum
-  )
-endif ()
-
 # Create an ALIAS target.
 add_library(AICxx::memory ALIAS memory_ObjLib)
 
