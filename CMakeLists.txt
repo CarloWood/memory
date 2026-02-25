@@ -39,11 +39,14 @@ target_sources(memory_ObjLib
   PRIVATE
     "DequeMemoryResource.cxx"
     "MemoryPagePool.cxx"
+    "MemoryMappedPool.cxx"
     "NodeMemoryPool.cxx"
+    "SimpleSegregatedStorage.cxx"
 
     "DequeAllocator.h"
     "DequeMemoryResource.h"
     "MemoryPagePool.h"
+    "MemoryMappedPool.h"
     "NodeMemoryPool.h"
     "NodeMemoryResource.h"
     "SimpleSegregatedStorage.h"
@@ -62,9 +65,12 @@ target_compile_features(memory_ObjLib
 )
 
 # Set link dependencies.
-#target_link_libraries(memory_ObjLib
-#  PUBLIC
-#)
+# If the target enchantum::enchantum is not found, then please
+# install enchantum by following the instructions here:...
+target_link_libraries(memory_ObjLib
+  PRIVATE
+    AICxx::utils
+)
 
 # Create an ALIAS target.
 add_library(AICxx::memory ALIAS memory_ObjLib)

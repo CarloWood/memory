@@ -100,20 +100,20 @@ std::ostream& operator<<(std::ostream& os, NodeMemoryPool const& pool);
 class NodeMemoryPool
 {
  private:
-  mutable std::mutex m_pool_mutex;      // Protects the pool against concurrent accesses.
+  mutable std::mutex pool_mutex_;       // Protects the pool against concurrent accesses.
 
-  size_t const m_nchunks;               // The number of `m_size' sized chunks to allocate at once. Should always be larger than 0.
-  FreeList* m_free_list;                // The next free chunk, or nullptr if there isn't any left.
-  std::vector<Begin*> m_blocks;         // A list of all allocated blocks.
-  size_t m_size;                        // The (fixed) size of a single chunk in bytes.
-                                        // alloc() always returns a chunk of this size except the first time when m_free_list is still 0.
-  size_t m_total_free;                  // The current total number of free chunks in the memory pool.
+  size_t const nchunks_;                // The number of `size_' sized chunks to allocate at once. Should always be larger than 0.
+  FreeList* free_list_;                 // The next free chunk, or nullptr if there isn't any left.
+  std::vector<Begin*> blocks_;          // A list of all allocated blocks.
+  size_t size_;                         // The (fixed) size of a single chunk in bytes.
+                                        // alloc() always returns a chunk of this size except the first time when free_list_ is still 0.
+  size_t total_free_;                   // The current total number of free chunks in the memory pool.
 
   friend void* ::operator new(std::size_t size, NodeMemoryPool& pool);
   void* alloc(size_t size);
 
  public:
-  NodeMemoryPool(int nchunks, size_t chunk_size = 0) : m_nchunks(nchunks), m_free_list(nullptr), m_size(chunk_size), m_total_free(0) { }
+  NodeMemoryPool(int nchunks, size_t chunk_size = 0) : nchunks_(nchunks), free_list_(nullptr), size_(chunk_size), total_free_(0) { }
 
   template<class Tp>
   Tp* malloc() { return static_cast<Tp*>(alloc(sizeof(Tp))); }
@@ -127,16 +127,16 @@ class NodeMemoryPool
 template<class Tp, class Mp>
 struct Allocator
 {
-  Mp& m_memory_pool;
+  Mp& memory_pool_;
 
   using value_type = Tp;
   size_t max_size() const { return 1; }
   Tp* allocate(std::size_t n);
-  void deallocate(Tp* p, std::size_t DEBUG_ONLY(n)) { ASSERT(n == 1); m_memory_pool.free(p); }
-  Allocator(Mp& memory_pool) : m_memory_pool(memory_pool) { }
-  template<class T> Allocator(Allocator<T, Mp> const& other) : m_memory_pool(other.m_memory_pool) { }
-  template<class T> bool operator==(Allocator<T, Mp> const& other) { return &m_memory_pool == &other.m_memory_pool; }
-  template<class T> bool operator!=(Allocator<T, Mp> const& other) { return &m_memory_pool != &other.m_memory_pool; }
+  void deallocate(Tp* p, std::size_t DEBUG_ONLY(n)) { ASSERT(n == 1); memory_pool_.free(p); }
+  Allocator(Mp& memory_pool) : memory_pool_(memory_pool) { }
+  template<class T> Allocator(Allocator<T, Mp> const& other) : memory_pool_(other.memory_pool_) { }
+  template<class T> bool operator==(Allocator<T, Mp> const& other) { return &memory_pool_ == &other.memory_pool_; }
+  template<class T> bool operator!=(Allocator<T, Mp> const& other) { return &memory_pool_ != &other.memory_pool_; }
 };
 
 template<class Tp, class Mp>
@@ -144,7 +144,7 @@ Tp* Allocator<Tp, Mp>::allocate(std::size_t DEBUG_ONLY(n))
 {
   // Only use this allocator with std::allocate_shared or std::list.
   ASSERT(n == 1);
-  return m_memory_pool.template malloc<Tp>();
+  return memory_pool_.template malloc<Tp>();
 }
 
 } // namespace memory

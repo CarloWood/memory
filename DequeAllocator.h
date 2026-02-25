@@ -61,37 +61,37 @@ template<typename T, typename ElementType = T>
 class DequeAllocator
 {
  private:
-  NodeMemoryResource* m_node_memory_resource;
+  NodeMemoryResource* node_memory_resource_;
 
  public:
   using value_type = T;
 
-  // m_node_memory_resource is not used when T = ElementType*.
+  // node_memory_resource_ is not used when T = ElementType*.
   using is_always_equal = std::conditional_t<std::is_same_v<T, ElementType>, std::false_type, std::true_type>;
 
-  DequeAllocator(NodeMemoryResource& node_memory_resource) : m_node_memory_resource(&node_memory_resource) { }
+  DequeAllocator(NodeMemoryResource& node_memory_resource) : node_memory_resource_(&node_memory_resource) { }
 
   using propagate_on_container_copy_assignment = std::true_type;
-  DequeAllocator(DequeAllocator const& allocator) noexcept : m_node_memory_resource(allocator.m_node_memory_resource) { }
+  DequeAllocator(DequeAllocator const& allocator) noexcept : node_memory_resource_(allocator.node_memory_resource_) { }
 
   using propagate_on_container_move_assignment = std::true_type;
   DequeAllocator& operator=(DequeAllocator const& allocator) noexcept
   {
-    m_node_memory_resource = allocator.m_node_memory_resource;
+    node_memory_resource_ = allocator.node_memory_resource_;
     return *this;
   }
 
   using propagate_on_container_swap = std::true_type;
-  void swap(DequeAllocator& other) { std::swap(m_node_memory_resource, other.m_node_memory_resource); }
+  void swap(DequeAllocator& other) { std::swap(node_memory_resource_, other.node_memory_resource_); }
 
   // Used by the constructor below.
-  NodeMemoryResource* nmr_ptr() const { return m_node_memory_resource; }
+  NodeMemoryResource* nmr_ptr() const { return node_memory_resource_; }
 
-  // m_node_memory_resource is copied, but not expected to be used!
+  // node_memory_resource_ is copied, but not expected to be used!
   // The only reason it is copied is because the standard requires that if the original type is constructed
   // from this result, it has to compare equal.
   template<typename U>
-  DequeAllocator(DequeAllocator<U, ElementType> const& other) : m_node_memory_resource(other.nmr_ptr()) { }
+  DequeAllocator(DequeAllocator<U, ElementType> const& other) : node_memory_resource_(other.nmr_ptr()) { }
 
   [[nodiscard]] T* allocate(std::size_t number_of_objects);
   void deallocate(T* p, std::size_t n) noexcept;
@@ -99,7 +99,7 @@ class DequeAllocator
   friend bool operator==(DequeAllocator<T, ElementType> const& a1, DequeAllocator<T, ElementType> const& a2) noexcept
   {
     if constexpr (std::is_same_v<T, ElementType>)
-      return a1.m_node_memory_resource == a2.m_node_memory_resource;
+      return a1.node_memory_resource_ == a2.node_memory_resource_;
     else
       return true;
   }
@@ -109,7 +109,7 @@ class DequeAllocator
     return !(a1 == a2);
   }
 
-  DequeAllocator select_on_container_copy_construction() { return {*m_node_memory_resource}; }
+  DequeAllocator select_on_container_copy_construction() { return {*node_memory_resource_}; }
 };
 
 template<typename T, typename ElementType>
@@ -117,7 +117,7 @@ T* DequeAllocator<T, ElementType>::allocate(std::size_t number_of_objects)
 {
   T* ptr;
   if constexpr (std::is_same_v<T, ElementType>)
-    ptr = static_cast<T*>(m_node_memory_resource->allocate(number_of_objects * sizeof(T)));
+    ptr = static_cast<T*>(node_memory_resource_->allocate(number_of_objects * sizeof(T)));
   else
     ptr = static_cast<T*>(DequeMemoryResource::s_instance.allocate(number_of_objects * sizeof(T)));
   return ptr;
@@ -127,7 +127,7 @@ template<typename T, typename ElementType>
 void DequeAllocator<T, ElementType>::deallocate(T* p, std::size_t number_of_objects) noexcept
 {
   if constexpr (std::is_same_v<T, ElementType>)
-    m_node_memory_resource->deallocate(p);
+    node_memory_resource_->deallocate(p);
   else
     DequeMemoryResource::s_instance.deallocate(p, number_of_objects * sizeof(T));
 }

@@ -43,7 +43,8 @@ namespace memory {
 //
 //   memory::MemoryPagePool mpp(0x8000);                 // Serves chunks of 32 kB.
 //   memory::NodeMemoryResource nmr(mpp);                // Serves chunks of unknown but fixed size (512 bytes in the case of a deque).
-//   memory::DequeAllocator<AIStatefulTask*> alloc(nmr); // Wrapper around a pointer to memory::NodeMemoryResource, providing an allocator interface.
+//   memory::DequeAllocator<AIStatefulTask*> alloc(nmr); // Wrapper around a pointer to memory::NodeMemoryResource,
+//                                                       // providing an allocator interface.
 //   std::deque<AIStatefulTask*, decltype(alloc)> test_deque(alloc);
 //
 // Note: it is possible to specify a block size upon construction (which obviously must be
@@ -53,34 +54,34 @@ class NodeMemoryResource
 {
  public:
   // Create an uninitialized NodeMemoryResource. Call init() to initialize it.
-  NodeMemoryResource() : m_mpp(nullptr), m_block_size(0) { }
+  NodeMemoryResource() : mpp_(nullptr), block_size_(0) { }
 
   // Create an initialized NodeMemoryResource.
-  NodeMemoryResource(MemoryPagePool& mpp, size_t block_size = 0) : m_mpp(&mpp), m_block_size(block_size)
+  NodeMemoryResource(MemoryPagePool& mpp, size_t block_size = 0) : mpp_(&mpp), block_size_(block_size)
   {
-    DoutEntering(dc::notice, "NodeMemoryResource::NodeMemoryResource({" << (void*)m_mpp << "}, " << block_size << ") [" << this << "]");
+    DoutEntering(dc::notice, "NodeMemoryResource::NodeMemoryResource({" << (void*)mpp_ << "}, " << block_size << ") [" << this << "]");
   }
 
   // Destructor.
   ~NodeMemoryResource()
   {
-    DoutEntering(dc::notice(m_mpp), "NodeMemoryResource::~NodeMemoryResource() [" << this << "]");
+    DoutEntering(dc::notice(mpp_), "NodeMemoryResource::~NodeMemoryResource() [" << this << "]");
   }
 
   // Late initialization.
   void init(MemoryPagePool* mpp_ptr, size_t block_size = 0)
   {
     // A NodeMemoryResource object may only be initialized once.
-    ASSERT(m_mpp == nullptr);
-    m_mpp = mpp_ptr;
-    m_block_size = block_size;
-    Dout(dc::notice(block_size > 0), "NodeMemoryResource::m_block_size using [" << m_mpp << "] set to " << block_size << " [" << this << "]");
+    ASSERT(mpp_ == nullptr);
+    mpp_ = mpp_ptr;
+    block_size_ = block_size;
+    Dout(dc::notice(block_size > 0), "NodeMemoryResource::block_size_ using [" << mpp_ << "] set to " << block_size << " [" << this << "]");
   }
 
   void* allocate(size_t block_size)
   {
     //DoutEntering(dc::notice|continued_cf, "NodeMemoryResource::allocate(" << block_size << ") = ");
-    size_t stored_block_size = m_block_size.load(std::memory_order_relaxed);
+    size_t stored_block_size = block_size_.load(std::memory_order_relaxed);
     if (AI_UNLIKELY(stored_block_size == 0))
     {
       // No mutex is required here; it is not allowed to have a race condition between
@@ -90,7 +91,7 @@ class NodeMemoryResource
       // happen. It is the responsibility of the user to make sure this is the case.
       //
       // Therefore we can assume here that any race conditions between multiple threads
-      // calling this function while m_block_size is still 0 happen with the same value
+      // calling this function while block_size_ is still 0 happen with the same value
       // of block_size.
 
       // Call NodeMemoryResource::init before using a default constructed NodeMemoryResource.
@@ -100,20 +101,20 @@ class NodeMemoryResource
       //
       // If this is inside a call to memory::DequeMemoryResource::allocate then you forgot to
       // construct a memory::DequeMemoryResource::Initialization object at the top of main.
-      ASSERT(m_mpp != nullptr);
-      m_block_size.store(block_size, std::memory_order_relaxed);
+      ASSERT(mpp_ != nullptr);
+      block_size_.store(block_size, std::memory_order_relaxed);
       stored_block_size = block_size;
-      Dout(dc::notice, "NodeMemoryResource::m_block_size using [" << m_mpp << "] set to " << block_size << " [" << this << "]");
+      Dout(dc::notice, "NodeMemoryResource::block_size_ using [" << mpp_ << "] set to " << block_size << " [" << this << "]");
     }
 #ifdef CWDEBUG
     else
       ASSERT(block_size <= stored_block_size);
 #endif
-    void* ptr = m_sss.allocate([this, stored_block_size](){
-          void* chunk = m_mpp->allocate();
+    void* ptr = sss_.allocate([this, stored_block_size](){
+          void* chunk = mpp_->allocate();
           if (!chunk)
             return false;
-          m_sss.add_block(chunk, m_mpp->block_size(), stored_block_size);
+          sss_.add_block(chunk, mpp_->block_size(), stored_block_size);
           return true;
         });
     //Dout(dc::finish, ptr);
@@ -123,13 +124,13 @@ class NodeMemoryResource
   void deallocate(void* ptr)
   {
     //DoutEntering(dc::notice, "NodeMemoryResource::deallocate(" << ptr << ")");
-    m_sss.deallocate(ptr);
+    sss_.deallocate(ptr);
   }
 
  private:
-  MemoryPagePool* m_mpp;
-  SimpleSegregatedStorage m_sss;
-  std::atomic<size_t> m_block_size;
+  MemoryPagePool* mpp_;
+  SimpleSegregatedStorage sss_;
+  std::atomic<size_t> block_size_;
 };
 
 } // namespace memory

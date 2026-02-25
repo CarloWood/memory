@@ -2,7 +2,7 @@
  * memory -- C++ Memory utilities
  *
  * @file
- * @brief Definition of class SimpleSegregatedStorage.
+ * @brief Declaration of class SimpleSegregatedStorage.
  *
  * @Copyright (C) 2019 - 2025  Carlo Wood.
  *
@@ -27,119 +27,132 @@
 
 #pragma once
 
+#include "PtrTag.h"
+#include "utils/macros.h"
 #include <atomic>
 #include <functional>
 #include <mutex>
-#include "debug.h"
 
 namespace memory {
 
 // Consistent state of SimpleSegregatedStorage exists of a singly linked list of FreeNode's.
 //
-//  m_head -->.--------------.   .-->.--------------.   .-->.--------------.   .-->.--------------.
-//             | m_next ------+--'    | m_next ------+--'    | m_next ------+--'    | m_next ------+--> nullptr
-//             |              |       |              |       |              |       |              |
-//             `--------------'       `--------------'       `--------------'       `--------------'
+//  head_ -->.-------------.   .-->.-------------.   .-->.-------------.   .-->.-------------.
+//           | next_ ------+--'    | next_ ------+--'    | next_ ------+--'    | next_ ------+--> nullptr
+//           |             |       |             |       |             |       |             |
+//           `-------------'       `-------------'       `-------------'       `-------------'
 //
 // Calling allocate() must return one block, removing it from the free list.
 // In the single threaded case that will be the first block, so that the result
 // after calling allocate() is:
 //
-//  m_head -----------------------.
-//  ptr ------>.--------------.   .-'>.--------------.   .-->.--------------.   .-->.--------------.
-//             | m_next ------+--'    | m_next ------+--'    | m_next ------+--'    | m_next ------+--> nullptr
-//             |              |       |              |       |              |       |              |
-//             `--------------'       `--------------'       `--------------'       `--------------'
+//  head_ ----------------------.
+//  ptr ---->.-------------.   .-'>.-------------.   .-->.-------------.   .-->.-------------.
+//           | next_ ------+--'    | next_ ------+--'    | next_ ------+--'    | next_ ------+--> nullptr
+//           |             |       |             |       |             |       |             |
+//           `-------------'       `-------------'       `-------------'       `-------------'
 //
 // Or in code:
 //
-// node = m_head
-// m_head = node->m_next;
-// return node;
+//   node = head_
+//   head_ = node->next_;
+//   return node;
 //
 // When multiple threads can call allocate() concurrently, this can only be implemented
 // in a lock-free way by using an atomic compare and exchange operation.
 //
 // Deallocating a node is the other way around:
 //
-// node->m_next = m_head;
-// m_head = node;
+//   node->next_ = head_;
+//   head_ = node;
 
-
-// SimpleSegregatedStorage
+// SimpleSegregatedStorageBase
 //
 // Maintains an unordered free list of blocks.
 //
-class SimpleSegregatedStorage
+class SimpleSegregatedStorageBase
 {
-  struct FreeNode { FreeNode* m_next; };
+ protected:
+  std::atomic<std::uintptr_t> head_tag_;        // Encodes a pointer that points to the first free memory block in the free-list,
+                                                // or end_of_list if the free-list is empty. Also encodes a "tag" of a few bits.
 
- private:
-  std::atomic<FreeNode*> m_head;        // Points to the first free memory block in the free list, or nullptr if the free list is empty.
- public:                                // To be used with std::scoped_lock<std::mutex> from calling classes.
-  std::mutex m_add_block_mutex;         // Protect against calling add_block concurrently.
+  // Construct an empty free list.
+  SimpleSegregatedStorageBase() : head_tag_(PtrTag::end_of_list) { }
+
+  // Allow pointers to SimpleSegregatedStorageBase that are allocated on the heap I guess...
+  virtual ~SimpleSegregatedStorageBase() = default;
+
+  // Called if `allocate()` runs into the end of the list.
+  // Returning false means that this storage is simply out of memory.
+  virtual bool try_allocate_more(std::function<bool()> const& add_new_block) { return false; }
+
+  [[gnu::always_inline]] bool CAS_head_tag(PtrTag& head_tag, PtrTag new_head_tag, std::memory_order order)
+  {
+    return head_tag_.compare_exchange_weak(head_tag.encoded_, new_head_tag.encoded_, order);
+  }
 
  public:
-  // Construct an empty free list.
-  SimpleSegregatedStorage() : m_head(nullptr) { }
+  // Initialize this SimpleSegregatedStorage with an existing free-list.
+  void initialize(void* head)
+  {
+    // Call this after default construction, before using the segregated storage.
+    ASSERT(head_tag_ == PtrTag::end_of_list);
+    head_tag_ = PtrTag::encode(head, 0);
+  }
 
   void* allocate(std::function<bool()> const& add_new_block)
   {
     for (;;)
     {
-      FreeNode* node = m_head.load(std::memory_order_relaxed);
-      if (AI_UNLIKELY(!node))
+      // Load the current value of head_tag_ into `head_tag`.
+      // Use std::memory_order_acquire to synchronize with the std::memory_order_release in deallocate,
+      // so that value of `next` read below will be the value written in deallocate corresponding to
+      // this head value.
+      PtrTag head_tag(head_tag_.load(std::memory_order_acquire));
+      while (head_tag != PtrTag::end_of_list)
       {
-        if (!try_allocate_more(add_new_block))
-          return nullptr;
-        continue;
+        PtrTag new_head_tag = head_tag.next();
+        // The std::memory_order_acquire is used in case of failure and required for the next
+        // read of next_ at the top of the current loop (the previous line).
+        if (AI_LIKELY(CAS_head_tag(head_tag, new_head_tag, std::memory_order_acquire)))
+          // Return the old head.
+          return head_tag.ptr();
+        // head_tag_ was changed (the new value is now in `head_tag`). Try again with the new value.
       }
-      while (AI_UNLIKELY(!m_head.compare_exchange_weak(node, node->m_next, std::memory_order_release, std::memory_order_relaxed) && node))
-        ;
-      if (AI_LIKELY(node))
-        return node;
+      // Reached the end of the list, try to allocate more memory.
+      if (!try_allocate_more(add_new_block))
+        return nullptr;
     }
   }
 
   // ptr must be a value previously returned by allocate().
   void deallocate(void* ptr)
   {
-    FreeNode* node = static_cast<FreeNode*>(ptr);
-    node->m_next = m_head.load(std::memory_order_relaxed);
-    while (!m_head.compare_exchange_weak(node->m_next, node, std::memory_order_release, std::memory_order_relaxed))
-      ;
-  }
-
-  bool try_allocate_more(std::function<bool()> const& add_new_block)
-  {
-    std::scoped_lock<std::mutex> lk(m_add_block_mutex);
-    return m_head.load(std::memory_order_relaxed) != nullptr || add_new_block();
-  }
-
-  // Only call this from the lambda add_new_block that was passed to allocate.
-  void add_block(void* block, size_t block_size, size_t partition_size)
-  {
-    unsigned int const number_of_partitions = block_size / partition_size;
-
-    // block_size must be a multiple of partition_size (at least 2 times).
-    ASSERT(number_of_partitions > 1);
-
-    char* const first_ptr = static_cast<char*>(block);
-    char* const last_ptr = first_ptr + (number_of_partitions - 1) * partition_size;     // > first_ptr, see ASSERT.
-    char* node = last_ptr;
-    do
+    typename PtrTag::FreeNode* const new_front_node = static_cast<typename PtrTag::FreeNode*>(ptr);
+    PtrTag head_tag(head_tag_.load(std::memory_order_relaxed));
+    for (;;)
     {
-      char* next_node = node;
-      node = next_node - partition_size;
-      reinterpret_cast<FreeNode*>(node)->m_next = reinterpret_cast<FreeNode*>(next_node);
+      PtrTag const new_head_tag(new_front_node, head_tag.tag());
+      new_front_node->next_ = head_tag.ptr();
+      // The std::memory_order_release is used in the case of success and causes the above
+      // store to `new_front_node->next_` to be visible after a load-acquire of head_tag_
+      // in allocate that reads the value of this `new_head_tag`.
+      if (AI_LIKELY(CAS_head_tag(head_tag, new_head_tag, std::memory_order_release)))
+        return;
     }
-    while (node != first_ptr);
-    FreeNode* first_node = reinterpret_cast<FreeNode*>(first_ptr);
-    FreeNode* last_node = reinterpret_cast<FreeNode*>(last_ptr);
-    last_node->m_next = m_head.load(std::memory_order_relaxed);
-    while (!m_head.compare_exchange_weak(last_node->m_next, first_node, std::memory_order_release, std::memory_order_relaxed))
-      ;
   }
+};
+
+class SimpleSegregatedStorage : public SimpleSegregatedStorageBase
+{
+ public:                                // To be used with std::scoped_lock<std::mutex> from calling classes.
+  std::mutex add_block_mutex_;          // Protect against calling add_block concurrently.
+
+ public:
+  using SimpleSegregatedStorageBase::SimpleSegregatedStorageBase;
+
+  bool try_allocate_more(std::function<bool()> const& add_new_block) override;
+  void add_block(void* block, size_t block_size, size_t partition_size);
 };
 
 } // namespace memory
