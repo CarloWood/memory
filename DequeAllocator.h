@@ -31,7 +31,7 @@ namespace memory {
 // At the top of main():
 //
 //   AIMemoryPagePool mpp;
-//   memmory::DequeMemoryResource::Initialization dmri(mpp.instance());
+//   memory::DequeMemoryResource::Initialization dmri(mpp.instance());
 //
 // Creating the allocator:
 //
