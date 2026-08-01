@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12...4.0.3)
+cmake_minimum_required(VERSION 3.12...4.3.4)
 
 project(memory
   DESCRIPTION "C++ Memory utilities"
