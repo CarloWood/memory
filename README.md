@@ -13,7 +13,7 @@ providing C++ memory related utilities for larger projects, including:
 
 The root project should be using
 [cmake](https://cmake.org/overview/),
-[cwm4](https://github.com/CarloWood/cwm4),
+[cmake-aicxx](https://github.com/CarloWood/cmake-aicxx),
 [cwds](https://github.com/CarloWood/cwds) and
 [utils](https://github.com/CarloWood/ai-utils).
 
@@ -39,7 +39,7 @@ more for initialization details.
 ## Adding the memory submodule to a project
 
 To add this submodule to a project, that project should already
-be set up to use [cwm4](https://github.com/CarloWood/cwm4).
+be set up to use [cmake-aicxx](https://github.com/CarloWood/cmake-aicxx).
 
 Simply execute the following in the root directory of that project:
 
