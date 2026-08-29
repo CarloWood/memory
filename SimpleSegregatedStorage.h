@@ -8,6 +8,7 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include "debug.h"      // ASSERT, UNUSED_ARG
 
 namespace memory {
 
@@ -60,7 +61,7 @@ class SimpleSegregatedStorageBase
 
   // Called if `allocate()` runs into the end of the list.
   // Returning false means that this storage is simply out of memory.
-  virtual bool try_allocate_more(std::function<bool()> const& add_new_block) { return false; }
+  virtual bool try_allocate_more(std::function<bool()> const& UNUSED_ARG(add_new_block)) { return false; }
 
   [[gnu::always_inline]] bool CAS_head_tag(PtrTag& head_tag, PtrTag new_head_tag, std::memory_order order)
   {
