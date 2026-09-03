@@ -5,6 +5,12 @@
 #include "SimpleSegregatedStorage.h"
 #include "debug.h"
 
+#ifdef CWDEBUG
+NAMESPACE_DEBUG_CHANNELS_START
+extern Channel memory;
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
+
 namespace memory {
 
 bool SimpleSegregatedStorage::try_allocate_more(std::function<bool()> const& add_new_block)
@@ -16,7 +22,11 @@ bool SimpleSegregatedStorage::try_allocate_more(std::function<bool()> const& add
 // Only call this from the lambda add_new_block that was passed to allocate.
 void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t partition_size)
 {
+  DoutEntering(dc::memory, "SimpleSegregatedStorage::add_block(" << block << ", " << block_size << ", " << partition_size << ")");
+
   unsigned int const number_of_partitions = block_size / partition_size;
+  Dout(dc::memory, "Creating a free list of " << number_of_partitions <<
+      " partitions in the memory range [" << block << ", " << (void*)((char*)block + block_size) << ").");
 
   // block_size must be a multiple of partition_size (at least 2 times).
   ASSERT(number_of_partitions > 1);

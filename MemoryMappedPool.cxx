@@ -87,7 +87,7 @@ std::string print_flags(int flags)
 MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t block_size, size_t file_size,
     Mode mode, bool zero_init) : MemoryPagePoolBase(block_size), mapped_base_(MAP_FAILED)
 {
-  DoutEntering(dc::notice, "MemoryMappedPool::MemoryMappedPool(" << filename << ", " << block_size << ", " << file_size << ", " <<
+  DoutEntering(dc::memory, "MemoryMappedPool::MemoryMappedPool(" << filename << ", " << block_size << ", " << file_size << ", " <<
 #ifdef USE_ENCHANTUM
       utils::to_string(mode) <<
 #else
@@ -318,7 +318,7 @@ MemoryMappedPool::MemoryMappedPool(std::filesystem::path const& filename, size_t
 
 MemoryMappedPool::~MemoryMappedPool()
 {
-  DoutEntering(dc::notice, "MemoryMappedPool::~MemoryMappedPool() [" << this << "]");
+  DoutEntering(dc::memory, "MemoryMappedPool::~MemoryMappedPool() [" << this << "]");
   if (mapped_base_ != MAP_FAILED)
     ::munmap(mapped_base_, mapped_size_);
 }

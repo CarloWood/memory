@@ -12,8 +12,13 @@
 #include <unistd.h>
 #include "debug.h"
 
-namespace memory {
+#ifdef CWDEBUG
+NAMESPACE_DEBUG_CHANNELS_START
+extern Channel memory;
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
 
+namespace memory {
 namespace details {
 
 // Helper class to provide memory_page_size().
@@ -73,7 +78,7 @@ class MemoryPagePool : public MemoryPagePoolBase
 
   ~MemoryPagePool() override
   {
-    DoutEntering(dc::notice, "MemoryPagePool::~MemoryPagePool() [" << this << "]");
+    DoutEntering(dc::memory, "MemoryPagePool::~MemoryPagePool() [" << this << "]");
     release();
   }
 

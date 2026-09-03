@@ -16,23 +16,29 @@ MemoryPagePool::MemoryPagePool(size_t block_size, blocks_t minimum_chunk_size, b
   // maximum_chunk_size must be larger or equal than minimum_chunk_size.
   ASSERT(maximum_chunk_size_ >= minimum_chunk_size_);
 
-  DoutEntering(dc::notice, "MemoryPagePool::MemoryPagePool(" <<
+  DoutEntering(dc::memory, "MemoryPagePool::MemoryPagePool(" <<
       block_size << ", " << minimum_chunk_size << ", " << maximum_chunk_size << ") [" << this << "]");
 
   // This capacity is enough for allocating twice the maximum_chunk_size of memory (and then rounded up to the nearest power of two).
   chunks_.reserve(utils::nearest_power_of_two(1 + utils::log2(maximum_chunk_size_)));
-  Dout(dc::notice, "The block size (" << block_size << " bytes) is " << (block_size / memory_page_size()) << " times the memory page size on this machine.");
-  Dout(dc::notice, "The capacity of chunks_ is " << chunks_.capacity() << '.');
+  Dout(dc::memory, "The block size (" << block_size << " bytes) is " << (block_size / memory_page_size()) << " times the memory page size on this machine.");
+  Dout(dc::memory, "The capacity of chunks_ is " << chunks_.capacity() << '.');
 }
 
 void MemoryPagePool::release()
 {
-  DoutEntering(dc::notice, "MemoryPagePool::release()");
+  DoutEntering(dc::memory, "MemoryPagePool::release()");
   std::scoped_lock<std::mutex> lock(sss_.add_block_mutex_);
   // Wink out any remaining allocations.
   for (auto ptr : chunks_)
     std::free(ptr);
-  Dout(dc::notice, "current size is " << (pool_blocks_ * block_size_) << " bytes.");
+  Dout(dc::memory, "current size is " << (pool_blocks_ * block_size_) << " bytes.");
 }
 
 } // namespace memory
+
+#ifdef CWDEBUG
+NAMESPACE_DEBUG_CHANNELS_START
+Channel memory("MEMORY");
+NAMESPACE_DEBUG_CHANNELS_END
+#endif

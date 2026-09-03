@@ -10,6 +10,12 @@
 #include <cstdlib>
 #include "debug.h"
 
+#ifdef CWDEBUG
+NAMESPACE_DEBUG_CHANNELS_START
+extern Channel memory;
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
+
 namespace memory {
 
 union Next
@@ -67,7 +73,7 @@ void* NodeMemoryPool::alloc(size_t size)
     // size_ must be greater or equal sizeof(Next), and a multiple of alignof(Chunk).
     ASSERT(size_ >= sizeof(Next) && (size_ & chunk_align_mask) == 0);
     // Allocate space for Begin::free plus Begin::pool followed by nchunks_ of size_ (offsetof(Allocated, data) + size_) (the real size of Allocated).
-    Dout(dc::notice, "NodeMemoryPool::alloc: allocating " << (offsetof(Begin, first_chunk) + nchunks_ * (offsetof(Allocated, data) + size_)) << " bytes of memory [" << (void*)this << "].");
+    Dout(dc::memory, "NodeMemoryPool::alloc: allocating " << (offsetof(Begin, first_chunk) + nchunks_ * (offsetof(Allocated, data) + size_)) << " bytes of memory [" << (void*)this << "].");
     Begin* begin = static_cast<Begin*>(std::malloc(offsetof(Begin, first_chunk) + nchunks_ * (offsetof(Allocated, data) + size_)));
     begin->pool = this;
     ptr = free_list_ = &begin->first_chunk.free_list;

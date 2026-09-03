@@ -27,7 +27,7 @@ constexpr std::size_t upper_size = index_to_size(i2s.size() - 1);
 
 void* DequeMemoryResource::allocate(std::size_t number_of_bytes)
 {
-  DoutEntering(dc::notice, "DequeMemoryResource::allocate(" << number_of_bytes << ") ; " << (number_of_bytes / sizeof(void*)));
+  DoutEntering(dc::memory, "DequeMemoryResource::allocate(" << number_of_bytes << ") ; " << (number_of_bytes / sizeof(void*)));
 
   // Make small values of index the fast path.
   if (AI_UNLIKELY(number_of_bytes > upper_size))
@@ -35,7 +35,7 @@ void* DequeMemoryResource::allocate(std::size_t number_of_bytes)
 
   int const index = size_to_index(number_of_bytes);
 
-  Dout(dc::notice, "DequeMemoryResource::allocate(" << number_of_bytes << ") is using index " << index << " / " << (nmra_size - 1));
+  Dout(dc::memory, "DequeMemoryResource::allocate(" << number_of_bytes << ") is using index " << index << " / " << (nmra_size - 1));
   return node_memory_resources_[index].allocate(number_of_bytes);
 }
 

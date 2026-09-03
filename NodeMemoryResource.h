@@ -35,28 +35,29 @@ class NodeMemoryResource
   // Create an initialized NodeMemoryResource.
   NodeMemoryResource(MemoryPagePool& mpp, size_t block_size = 0) : mpp_(&mpp), block_size_(block_size)
   {
-    DoutEntering(dc::notice, "NodeMemoryResource::NodeMemoryResource({" << (void*)mpp_ << "}, " << block_size << ") [" << this << "]");
+    DoutEntering(dc::memory, "NodeMemoryResource::NodeMemoryResource({" << (void*)mpp_ << "}, " << block_size << ") [" << this << "]");
   }
 
   // Destructor.
   ~NodeMemoryResource()
   {
-    DoutEntering(dc::notice(mpp_), "NodeMemoryResource::~NodeMemoryResource() [" << this << "]");
+    DoutEntering(dc::memory(mpp_), "NodeMemoryResource::~NodeMemoryResource() [" << this << "]");
   }
 
   // Late initialization.
   void init(MemoryPagePool* mpp_ptr, size_t block_size = 0)
   {
+    DoutEntering(dc::memory(block_size > 0), "NodeMemoryResource::init(" << mpp_ptr << ", " << block_size << ") [" << this << "]");
+
     // A NodeMemoryResource object may only be initialized once.
     ASSERT(mpp_ == nullptr);
     mpp_ = mpp_ptr;
     block_size_ = block_size;
-    Dout(dc::notice(block_size > 0), "NodeMemoryResource::block_size_ using [" << mpp_ << "] set to " << block_size << " [" << this << "]");
   }
 
   void* allocate(size_t block_size)
   {
-    //DoutEntering(dc::notice|continued_cf, "NodeMemoryResource::allocate(" << block_size << ") = ");
+    //DoutEntering(dc::memory|continued_cf, "NodeMemoryResource::allocate(" << block_size << ") = ");
     size_t stored_block_size = block_size_.load(std::memory_order_relaxed);
     if (AI_UNLIKELY(stored_block_size == 0))
     {
@@ -80,7 +81,7 @@ class NodeMemoryResource
       ASSERT(mpp_ != nullptr);
       block_size_.store(block_size, std::memory_order_relaxed);
       stored_block_size = block_size;
-      Dout(dc::notice, "NodeMemoryResource::block_size_ using [" << mpp_ << "] set to " << block_size << " [" << this << "]");
+      Dout(dc::memory, "NodeMemoryResource::block_size_ using [" << mpp_ << "] set to " << block_size << " [" << this << "]");
     }
 #ifdef CWDEBUG
     else
@@ -99,7 +100,7 @@ class NodeMemoryResource
 
   void deallocate(void* ptr)
   {
-    //DoutEntering(dc::notice, "NodeMemoryResource::deallocate(" << ptr << ")");
+    //DoutEntering(dc::memory, "NodeMemoryResource::deallocate(" << ptr << ")");
     sss_.deallocate(ptr);
   }
 
