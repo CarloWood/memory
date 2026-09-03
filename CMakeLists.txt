@@ -52,24 +52,17 @@ target_sources(memory_ObjLib
     "SimpleSegregatedStorage.h"
 )
 
-# Required include search-paths.
-get_target_property(CWDS_INTERFACE_INCLUDE_DIRECTORIES AICxx::cwds INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(memory_ObjLib
-  PUBLIC
-    "${CWDS_INTERFACE_INCLUDE_DIRECTORIES}" # For sys.h and debug.h.
-)
-
 # Require support for C++20.
 target_compile_features(memory_ObjLib
   PUBLIC cxx_std_20
 )
 
 # Set link dependencies.
-# If the target enchantum::enchantum is not found, then please
-# install enchantum by following the instructions here:...
+# If the target enchantum::enchantum is not found, then please install enchantum by following the instructions in utils/to_string.h.
 target_link_libraries(memory_ObjLib
-  PRIVATE
+  PUBLIC
     AICxx::utils
+    AICxx::cwds
 )
 
 # Create an ALIAS target.
