@@ -103,6 +103,12 @@ class NodeMemoryResource
     sss_.deallocate(ptr);
   }
 
+  // Accessor.
+
+  // Only call this when you are sure that the NodeMemoryResource was already initialized.
+  // It is not thread-safe to use this to test if the NodeMemoryResource was initialized or not.
+  MemoryPagePool* mpp() const { return mpp_; }
+
  private:
   MemoryPagePool* mpp_;
   SimpleSegregatedStorage sss_;
