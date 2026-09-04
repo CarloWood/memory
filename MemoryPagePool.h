@@ -59,6 +59,9 @@ class MemoryPagePoolBase : public details::MemoryPageSize
 //
 class MemoryPagePool : public MemoryPagePoolBase
 {
+ public:
+  static constexpr size_t default_block_size = 0x8000;
+
  protected:
   SimpleSegregatedStorage sss_;
   blocks_t const minimum_chunk_size_;  // The minimum size of internally allocated contiguous memory blocks, in blocks.
@@ -70,11 +73,11 @@ class MemoryPagePool : public MemoryPagePoolBase
   virtual blocks_t default_maximum_chunk_size(blocks_t UNUSED_ARG(minimum_chunk_size)) { return 1024; }
 
  public:
-  MemoryPagePool(size_t block_size,                     // The size of a block as returned by allocate(), in bytes;
-                                                        // must be a multiple of the memory page size.
-                 blocks_t minimum_chunk_size = 0,       // A value of 0 will use the value returned by default_minimum_chunk_size().
-                 blocks_t maximum_chunk_size = 0);      // A value of 0 will use the value returned by
-                                                        // default_maximum_chunk_size(minimum_chunk_size).
+  MemoryPagePool(size_t block_size = default_block_size,        // The size of a block as returned by allocate(), in bytes;
+                                                                // must be a multiple of the memory page size.
+                 blocks_t minimum_chunk_size = 0,               // A value of 0 will use the value returned by default_minimum_chunk_size().
+                 blocks_t maximum_chunk_size = 0);              // A value of 0 will use the value returned by
+                                                                // default_maximum_chunk_size(minimum_chunk_size).
 
   ~MemoryPagePool() override
   {
