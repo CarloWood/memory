@@ -87,10 +87,12 @@ class MemoryPagePool : public MemoryPagePoolBase
 
   void* allocate() override
   {
+    DoutEntering(dc::memory, "MemoryPagePool::allocate() [" << this << "]");
     return sss_.allocate([this](){
         // This runs in the critical area of SimpleSegregatedStorage::add_block_mutex_.
         blocks_t extra_blocks = std::clamp(pool_blocks_, minimum_chunk_size_, maximum_chunk_size_);
         size_t extra_size = extra_blocks * block_size_;
+        Dout(dc::memory, "MemoryPagePool::allocate: allocating " << extra_blocks << " extra blocks of memory (" << extra_size << " bytes).");
         void* chunk = std::aligned_alloc(memory_page_size(), extra_size);
         if (AI_UNLIKELY(chunk == nullptr))
           return false;
