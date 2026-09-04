@@ -25,8 +25,8 @@ void SimpleSegregatedStorage::add_block(void* block, size_t block_size, size_t p
   DoutEntering(dc::memory, "SimpleSegregatedStorage::add_block(" << block << ", " << block_size << ", " << partition_size << ")");
 
   unsigned int const number_of_partitions = block_size / partition_size;
-  Dout(dc::memory, "Creating a free list of " << number_of_partitions <<
-      " partitions in the memory range [" << block << ", " << (void*)((char*)block + block_size) << ").");
+  Dout(dc::memory, "Creating a free list of " << number_of_partitions << " partitions with size " <<
+      partition_size << " in the memory range [" << block << ", " << (void*)((char*)block + block_size) << ").");
 
   // block_size must be a multiple of partition_size (at least 2 times).
   ASSERT(number_of_partitions > 1);
