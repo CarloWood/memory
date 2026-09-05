@@ -48,7 +48,7 @@ class GeometricMemoryResource
 
  protected:
   // allocation_size must be smallest_allocation times a power of two and not larger than largest_allocation.
-  static constexpr nmr_index_type allocation_size_to_nmr_index(allocation_class_type allocation_size)
+  static constexpr nmr_index_type allocation_size_to_nmr_index(allocation_size_type allocation_size)
   {
     // Call this function only on values returned by elements_to_allocation_size.
     ASSERT(smallest_allocation <= allocation_size && allocation_size <= largest_allocation);
