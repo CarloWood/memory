@@ -4,9 +4,15 @@
 #include "NodeMemoryResource.h"
 #include "utils/is_power_of_two.h"
 #include "utils/log2.h"
+#include "utils/macros.h"
+#include "utils/nearest_power_of_two.h"
 
 #include <array>
+#include <concepts>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
 #include <mutex>        // std::once_flag
 #include <new>
 #include <stdexcept>
@@ -26,6 +32,7 @@ static constexpr allocation_size_type default_smallest_allocation = default_alig
 template <allocation_size_type mpp_block_size, allocation_size_type smallest_allocation>
 struct MaxToLargest
 {
+  static_assert(smallest_allocation < mpp_block_size, "largest_allocation must become larger than smallest_allocation");
   static constexpr allocation_size_type largest_allocation =
       (allocation_size_type{1} << utils::log2(mpp_block_size / smallest_allocation)) * smallest_allocation;
 };
@@ -39,6 +46,7 @@ class GeometricMemoryResource
 
   // Sanity checks.
   static_assert(utils::is_power_of_two(alignment), "alignment must be a power of two");
+  static_assert(alignment < 32, "GeometricMemoryResource is not suited for large alignments");
   static_assert(smallest_allocation > 0);
   static_assert(smallest_allocation < largest_allocation, "GeometricMemoryResource requires at least one NodeMemoryResource size class");
   static_assert(smallest_allocation % alignment == 0, "smallest_allocation must be a multiple of alignment");
@@ -165,7 +173,8 @@ class VectorAllocator
   VectorAllocator(memory::MemoryPagePool& mpp) : GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>(mpp)
   {
     // mpp_block_size must be the same as the size that was passed to mpp.
-    ASSERT(mpp_block_size == mpp.block_size());
+    if (mpp_block_size != mpp.block_size())
+      throw std::invalid_argument("VectorAllocator: MemoryPagePool block size does not match mpp_block_size");
   }
 
  private:
