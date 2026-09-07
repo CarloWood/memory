@@ -119,18 +119,22 @@ void GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>
 // An allocation request larger than mpp_block_size is served by std::allocator.
 // Allocations of size 0 return nullptr. Deallocating nullptr is a no-op.
 //
-template <typename T, allocation_size_type smallest_allocation = detail::default_smallest_allocation,
-          allocation_size_type mpp_block_size = memory::MemoryPagePool::default_block_size,
-          allocation_size_type alignment = detail::default_alignment>
+template <typename T,
+          allocation_size_type smallest_allocation_ = detail::default_smallest_allocation,
+          allocation_size_type mpp_block_size_ = memory::MemoryPagePool::default_block_size,
+          allocation_size_type alignment_ = detail::default_alignment>
 class VectorAllocator
-    : public GeometricMemoryResource<smallest_allocation, detail::MaxToLargest<mpp_block_size, smallest_allocation>::largest_allocation, alignment>
+    : public GeometricMemoryResource<smallest_allocation_, detail::MaxToLargest<mpp_block_size_, smallest_allocation_>::largest_allocation, alignment_>
 {
-  static_assert(alignof(T) <= alignment, "The used alignment must be enough for the stored element");
+  static_assert(alignof(T) <= alignment_, "The used alignment must be enough for the stored element");
 
  public:
   static constexpr std::size_t element_size = sizeof(T);
-  static constexpr allocation_size_type largest_allocation = detail::MaxToLargest<mpp_block_size, smallest_allocation>::largest_allocation;
-  using Base_ = GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>;
+  static constexpr allocation_size_type smallest_allocation = smallest_allocation_;
+  static constexpr allocation_size_type largest_allocation = detail::MaxToLargest<mpp_block_size_, smallest_allocation_>::largest_allocation;
+  static constexpr allocation_size_type mpp_block_size = mpp_block_size_;
+  static constexpr allocation_size_type alignment = alignment_;
+  using Base_ = GeometricMemoryResource<smallest_allocation_, largest_allocation, alignment_>;
 
  private:
   static constexpr std::size_t allocation_size_to_elements(allocation_size_type size) { return size / element_size; }
@@ -202,7 +206,7 @@ class VectorAllocator
       return std::allocator<value_type>{}.allocate(n);
 
     allocation_size_type const allocation_size = elements_to_allocation_size(n);
-    int const index = allocation_size_to_nmr_index(allocation_size);
+    size_t const index = allocation_size_to_nmr_index(allocation_size);
     Dout(dc::memory, "Allocating " << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes from index " << index << ".");
     void* const allocation = index < nmrs_.size() ? nmrs_[index].allocate(allocation_size) : mpp_->allocate();
     if (allocation == nullptr)
@@ -248,7 +252,7 @@ class VectorAllocator
       return;
     }
     std::size_t const allocation_size = elements_to_allocation_size(n);
-    int const index = allocation_size_to_nmr_index(allocation_size);
+    std::size_t const index = allocation_size_to_nmr_index(allocation_size);
     Dout(dc::memory, "Deallocating " << n << " elements from index " << index << " (" << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes).");
     if (AI_LIKELY(index < nmrs_.size()))
       nmrs_[index].deallocate(p);
