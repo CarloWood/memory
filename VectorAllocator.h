@@ -64,31 +64,15 @@ class GeometricMemoryResource
     return utils::log2(allocation_class);
   }
 
- protected:
   // nmrs_ contains the NodeMemoryResource's for the size classes {smallest_allocation, ..., largest_allocation}.
   static constexpr nmr_index_type number_of_allocation_sizes = allocation_size_to_nmr_index(largest_allocation) + 1;
   static std::array<memory::NodeMemoryResource, number_of_allocation_sizes> nmrs_;
 
- private:
-  static std::once_flag initialize_nmrs_once_;
-
- public:
   // Bind the shared size-class resources to mpp the first time this allocator specialization is constructed.
   //
   // The pool must outlive every allocator and allocation of this specialization. Concurrent construction is safe;
   // the first supplied pool remains the upstream resource for all later allocator copies and constructions.
-  GeometricMemoryResource(MemoryPagePool& mpp)
-  {
-    std::call_once(initialize_nmrs_once_, [&mpp] {
-      allocation_size_type allocation_size = smallest_allocation;
-      for (NodeMemoryResource& nmr : nmrs_)
-      {
-        // Note that this doesn't allocate any memory pages yet. That only happens once a NodeMemoryResource is first used.
-        nmr.init(&mpp, allocation_size);
-        allocation_size *= 2;
-      }
-    });
-  }
+  void initialize(MemoryPagePool& mpp);
 };
 
 template <allocation_size_type smallest_allocation, allocation_size_type largest_allocation, allocation_size_type alignment>
@@ -96,7 +80,19 @@ std::array<memory::NodeMemoryResource, GeometricMemoryResource<smallest_allocati
     GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>::nmrs_;
 
 template <allocation_size_type smallest_allocation, allocation_size_type largest_allocation, allocation_size_type alignment>
-std::once_flag GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>::initialize_nmrs_once_;
+void GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>::initialize(MemoryPagePool& mpp)
+{
+  static std::once_flag initialize_nmrs_once_;
+  std::call_once(initialize_nmrs_once_, [&mpp] {
+    allocation_size_type allocation_size = smallest_allocation;
+    for (NodeMemoryResource& nmr : nmrs_)
+    {
+      // Note that this doesn't allocate any memory pages yet. That only happens once a NodeMemoryResource is first used.
+      nmr.init(&mpp, allocation_size);
+      allocation_size *= 2;
+    }
+  });
+}
 
 // class VectorAllocator
 //
@@ -136,6 +132,7 @@ class VectorAllocator
   static constexpr allocation_size_type largest_allocation = detail::MaxToLargest<mpp_block_size, smallest_allocation>::largest_allocation;
   using Base_ = GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>;
 
+ private:
   static constexpr std::size_t allocation_size_to_elements(allocation_size_type size) { return size / element_size; }
 
   // And the inverse of that.
@@ -148,10 +145,13 @@ class VectorAllocator
     return smallest_allocation * utils::nearest_power_of_two(units);
   }
 
+ public:
   // Trying to allocate more elements than this makes VectorAllocator fall back to std::allocator.
   // We use mpp_block_size here because that is the largest block returned.
   static constexpr std::size_t maximum_number_of_elements = allocation_size_to_elements(mpp_block_size);
+  static constexpr std::size_t elements_fitting_in_two_times_largest_allocation = allocation_size_to_elements(2 * largest_allocation);
 
+ private:
   MemoryPagePool* mpp_;         // The MemoryPagePool used for allocation sizes in the range (largest_allocation, mpp_block_size].
 
  public:
@@ -165,14 +165,16 @@ class VectorAllocator
     using other = VectorAllocator<U, smallest_allocation, mpp_block_size, alignment>;
   };
 
-  VectorAllocator(memory::MemoryPagePool& mpp)
-    : GeometricMemoryResource<smallest_allocation, largest_allocation, alignment>(mpp),
-      mpp_(&mpp)
+  VectorAllocator(memory::MemoryPagePool& mpp) : mpp_(&mpp)
   {
     // mpp_block_size must be the same as the size that was passed to mpp.
     if (mpp_block_size != mpp.block_size())
       throw std::invalid_argument("VectorAllocator: MemoryPagePool block size does not match mpp_block_size");
+    Base_::initialize(mpp);
   }
+
+  template <typename, allocation_size_type, allocation_size_type, allocation_size_type>
+  friend class VectorAllocator;
 
   template <typename U>
   VectorAllocator(VectorAllocator<U, smallest_allocation, mpp_block_size, alignment> const& other) noexcept : Base_(other), mpp_(other.mpp_) { }
@@ -208,19 +210,31 @@ class VectorAllocator
     return static_cast<value_type*>(allocation);
   }
 
+  // This can be used to pass to `reserve`.
   static std::size_t optimal_capacity(std::size_t n)
   {
-    if (AI_UNLIKELY(n > maximum_number_of_elements))
-      return n;
+    // largest_allocation < 2 * largest_allocation <= mpp_block_size < 4 * largest_allocation
+    //                                                    ^
+    //                                                    |
+    //                                      can fit maximum_number_of_elements
+    //
+    // If 2 * largest_allocation < mpp_block_size, then calling elements_to_allocation_size with a number of
+    // elements in the range (elements_fitting_in_two_times_largest_allocation, maximum_number_of_elements]
+    // results in an allocation_size of 4 * largest_allocation, but maximum_number_of_elements should be returned.
+    if (AI_UNLIKELY(n > elements_fitting_in_two_times_largest_allocation))
+      return n <= maximum_number_of_elements ? maximum_number_of_elements : n;
+
     std::size_t const allocation_size = elements_to_allocation_size(n);
     return allocation_size_to_elements(allocation_size);
   }
 
+#if __cplusplus >= 202302L
   std::allocation_result<pointer, size_type> allocate_at_least(std::size_t n)
   {
     std::size_t const count = optimal_capacity(n);
     return {allocate(count), count};
   }
+#endif
 
   // Return storage at p to the shared size-class resource selected by the corresponding n-object allocation.
   void deallocate(value_type* p, std::size_t n) noexcept

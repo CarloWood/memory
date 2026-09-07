@@ -45,7 +45,7 @@ class NodeMemoryResource
   }
 
   // Late initialization.
-  void init(MemoryPagePool* mpp_ptr, size_t block_size = 0)
+  void init(MemoryPagePool* mpp_ptr, size_t block_size = 0) noexcept
   {
     DoutEntering(dc::memory(block_size > 0), "NodeMemoryResource::init(" << mpp_ptr << ", " << block_size << ") [" << this << "]");
 
