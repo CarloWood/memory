@@ -55,6 +55,14 @@ class NodeMemoryResource
     block_size_ = block_size;
   }
 
+  // Deinitialization.
+  void deinit()
+  {
+    DoutEntering(dc::memory, "NodeMemoryResource::deinit() [" << this << "]");
+    mpp_ = nullptr;
+    block_size_ = 0;
+  }
+
   void* allocate(size_t block_size)
   {
     //DoutEntering(dc::memory|continued_cf, "NodeMemoryResource::allocate(" << block_size << ") = ");

@@ -73,6 +73,15 @@ class GeometricMemoryResource
   // The pool must outlive every allocator and allocation of this specialization. Concurrent construction is safe;
   // the first supplied pool remains the upstream resource for all later allocator copies and constructions.
   void initialize(MemoryPagePool& mpp);
+
+ public:
+  // Call deinit() on all NodeMemoryResource's.
+  // This only makes sense in debug mode because otherwise this hardly has any effect.
+  static void deinit()
+  {
+    for (nmr_index_type i = 0; i < number_of_allocation_sizes; ++i)
+      nmrs_[i].deinit();
+  }
 };
 
 template <allocation_size_type smallest_allocation, allocation_size_type largest_allocation, allocation_size_type alignment>
