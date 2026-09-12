@@ -216,7 +216,7 @@ class VectorAllocator
 
     allocation_size_type const allocation_size = elements_to_allocation_size(n);
     size_t const index = allocation_size_to_nmr_index(allocation_size);
-    Dout(dc::memory, "Allocating " << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes from index " << index << ".");
+    //Dout(dc::memory, "Allocating " << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes from index " << index << ".");
     void* const allocation = index < nmrs_.size() ? nmrs_[index].allocate(allocation_size) : mpp_->allocate();
     if (allocation == nullptr)
       throw std::bad_alloc{};
@@ -262,7 +262,7 @@ class VectorAllocator
     }
     std::size_t const allocation_size = elements_to_allocation_size(n);
     std::size_t const index = allocation_size_to_nmr_index(allocation_size);
-    Dout(dc::memory, "Deallocating " << n << " elements from index " << index << " (" << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes).");
+    //Dout(dc::memory, "Deallocating " << n << " elements from index " << index << " (" << (index < nmrs_.size() ? allocation_size : mpp_block_size) << " bytes).");
     if (AI_LIKELY(index < nmrs_.size()))
       nmrs_[index].deallocate(p);
     else
